@@ -1,0 +1,11 @@
+# Python Cache
+__pycache__/
+
+# Virtual Environment
+env/
+
+# Image Storage
+image_store/
+
+# Environment Configuration File
+.env
