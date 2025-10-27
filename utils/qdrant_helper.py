@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional, Dict, Any
 from qdrant_client import QdrantClient
+from qdrant_client.http.models import Filter, FieldCondition, Range, MatchValue
 from qdrant_client.models import VectorParams, Distance, PointStruct, QueryResponse
 from config.settings import Config
 
@@ -94,6 +95,40 @@ class QdrantHelper:
         except Exception as e:
             logger.error(f"Error querying points: {e}")
             return None
+
+
+    def metadata_based_searching(self, query_vector: List[float], metadata_json: str, limit: int = 5) -> List[str]:
+        """Search images by metadata using external API"""
+        key = list(metadata_json.keys())[0]
+        value = metadata_json[key]
+
+        search_filter = Filter(
+            must=[
+                FieldCondition(
+                    key=key,
+                    match=MatchValue(value=value)
+                )
+            ]
+        )
+
+        search_results = self.client.search(
+            collection_name=self.collection_name,
+            query_vector=query_vector,  # Your query vector
+            query_filter=search_filter,
+            limit=limit
+        )
+       
+        results = []
+        for searches in search_results:
+            results.append({
+                "id": searches.id,
+                "score": searches.score,
+                "payload": searches.payload
+            })
+       
+        return results
+
+
 
 # Global instance
 qdrant_helper = QdrantHelper()

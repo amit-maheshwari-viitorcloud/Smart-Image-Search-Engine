@@ -10,7 +10,8 @@ def search_by_feature(query: str):
 @tool
 def search_by_metadata(query: str):
     """Search images for queries about metadata only (artist, title, date, etc)."""
-    return search_service.search_by_metadata(query)
+    return search_service.search_by_api(query)
+    # return search_service.search_by_metadata(query)
 
 @tool
 def search_hybrid(query: str):

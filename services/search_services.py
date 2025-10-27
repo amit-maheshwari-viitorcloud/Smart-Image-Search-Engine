@@ -1,17 +1,21 @@
 import os
 import glob
+import json
+import logging
 import streamlit as st
 from PIL import Image
 from typing import List, Dict, Any
 from tqdm import tqdm
 from qdrant_client.models import PointStruct
-import logging
+from langchain_groq import ChatGroq
 
 from config.settings import Config
 from utils.qdrant_helper import qdrant_helper
 from utils.clip_helper import clip_helper
 from endpoints.api_endpoints import api_client
 from utils.helpers import load_image_from_path
+from agents.prompts import metadata_system_prompt
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,56 @@ class SearchService:
     def __init__(self):
         self.is_indexed = False
     
+
+    def store_sample_metadata(self) -> List[str]:
+        points = []
+
+        from api_sample_data import sample_data
+        data_dict = sample_data["results"]["data"]
+            
+        for idx, data in enumerate(data_dict):
+            try:
+                dict_data = {
+                    "id": data["id"],
+                    "date": data["date"],
+                    "accession_number": data["accession_number"],
+                    "medium": data["medium"],
+                    "dimensions": data["dimensions"],
+                    "status": data["status"],
+                    "public_access": data["public_access"],
+                    "path": data["primary_image"],
+                    "instance_id": data["instance_id"],
+                    "title": data["title"],
+                    "department_id": data["department_id"],
+                    "department": data["department"],
+                    "period": data["period"],
+                    "signed": data["signed"],
+                    "keywords": data["keywords"],
+                    "condition": data["condition"],
+                    "inscribed": data["inscribed"],
+                    "paper_support": data["paper_support"],
+                    "attributes": data["attributes"],
+                    "artist_bio": data["artists"][0]["bio"],
+                    "artist_name": data["artists"][0]["name"],
+                }
+
+                image = load_image_from_path(data["primary_image"])
+                if image:
+                    embedding = clip_helper.get_image_embedding(image)
+                    points.append(
+                        PointStruct(
+                            id=idx,
+                            vector=embedding.tolist(),
+                            payload=dict_data
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Skipping image {data}: {e}")
+                continue
+        
+        return points
+
+
     @st.cache_resource
     def build_image_index(_self, force_rebuild: bool = False) -> bool:
         """Build image index in Qdrant"""
@@ -32,15 +86,22 @@ class SearchService:
             if not qdrant_helper.create_collection():
                 return False
             
-            # Get all image paths
+            # ##################################
+            # ## Store sample metadata points ##
+            # ##################################
+            # points = _self.store_sample_metadata()
+
+            #######################################
+            # Store data from image_store folder ##
+            #######################################
             image_paths = _self._get_all_image_paths()
             if not image_paths:
                 logger.warning("No images found in image store")
                 return False
             
-            # Process images and create embeddings
             points = []
-            
+
+            # Process images and create embeddings
             for idx, path in enumerate(tqdm(image_paths, desc="Processing images")):
                 try:
                     image = load_image_from_path(path)
@@ -57,6 +118,8 @@ class SearchService:
                     logger.warning(f"Skipping image {path}: {e}")
                     continue
             
+            ##################### Save data from the image_store folder till here #########################
+
             if points:
                 success = qdrant_helper.upsert_points(points)
                 if success:
@@ -69,6 +132,7 @@ class SearchService:
             logger.error(f"Error building image index: {e}")
             return False
     
+    
     def search_by_feature(self, query: str) -> List[str]:
         """Search images by text query using CLIP"""
         try:
@@ -76,10 +140,8 @@ class SearchService:
                 if not self.build_image_index():
                     return []
             
-            # Get text embedding
             text_embedding = clip_helper.get_text_embedding(query)
             
-            # Search in Qdrant
             results = qdrant_helper.search_vectors(
                 query_vector=text_embedding.tolist(),
                 # limit=Config.DEFAULT_TOP_K,
@@ -91,6 +153,7 @@ class SearchService:
             logger.error(f"Error in text search: {e}")
             return []
     
+
     def search_by_image(self, image: Image.Image) -> List[Dict[str, Any]]:
         """Search similar images using image query"""
         try:
@@ -118,16 +181,63 @@ class SearchService:
         except Exception as e:
             logger.error(f"Error in image search: {e}")
             return []
+
     
-    def search_by_metadata(self, query: str) -> List[str]:
+    def search_by_api(self, query: str) -> List[str]:
         """Search images by metadata using external API"""
-        return api_client.search_by_metadata(query)
-    
+        return api_client.search_by_api(query)
+  
+
+    def initialize_llm(self):
+        llm = ChatGroq(
+            model="openai/gpt-oss-20b",
+            temperature=0,
+            api_key=Config.GROQ_API_KEY
+        )
+        return llm
+
+
+    def create_metadata(self, query: str) -> List[str]:
+        messages = [
+            ("system", metadata_system_prompt),
+            ("human", query),
+        ]
+
+        llm = self.initialize_llm()    
+        response = llm.invoke(messages).content
+        result = json.loads(response)
+        return result
+
+
+    def search_by_metadata(self, query: str) -> List[str]:
+        """Search images by metadata using external API"""        
+        try:
+            metadata_json = self.create_metadata(query)
+
+            if not self.is_indexed:
+                if not self.build_image_index():
+                    return []
+
+            # Get text embedding
+            text_embedding = clip_helper.get_text_embedding(query)
+
+            results = qdrant_helper.metadata_based_searching(
+                # query=query,
+                query_vector=text_embedding.tolist(),
+                metadata_json=metadata_json
+            )
+
+            return [result["payload"]["path"] for result in results]
+        except Exception as e:
+            logger.error(f"Error in metadata search: {e}")
+            return []
+
+
     def hybrid_search(self, query: str) -> List[str]:
         """Combine metadata and feature-based search"""
         try:
-            # Get results from metadata search
-            metadata_results = self.search_by_metadata(query)
+            metadata_results = self.search_by_api(query)            # For API based searching
+            # metadata_results = self.search_by_metadata(query)     # For Metadata based searching
             
             if not metadata_results:
                 return []

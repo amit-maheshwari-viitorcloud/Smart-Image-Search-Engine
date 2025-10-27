@@ -32,7 +32,7 @@ class APIClient:
             logger.error(f"Error getting OAuth token: {e}")
             return None
     
-    def search_by_metadata(self, search_keyword: str) -> List[str]:
+    def search_by_api(self, search_keyword: str) -> List[str]:
         """Search images using metadata API"""
         try:
             if not self.oauth_token:
