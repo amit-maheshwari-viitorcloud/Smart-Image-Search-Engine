@@ -1,3 +1,4 @@
+import re
 import os
 import glob
 import json
@@ -6,6 +7,7 @@ import streamlit as st
 from PIL import Image
 from typing import List, Dict, Any
 from tqdm import tqdm
+from datetime import datetime
 from qdrant_client.models import PointStruct
 from langchain_groq import ChatGroq
 
@@ -25,6 +27,26 @@ class SearchService:
     def __init__(self):
         self.is_indexed = False
     
+    def get_single_range(self, text) -> str:
+        current_year = datetime.now().year
+        text = text.lower().strip()
+        years = list(map(int, re.findall(r'\d{4}', text)))
+        
+        if 'after' in text and years:
+            return years[0], current_year
+        elif 'before' in text and years:
+            start_year = 0
+            return start_year, years[0]
+        elif ';' in text or ',' in text:
+            years = list(map(int, re.findall(r'\d{4}', text)))
+            if len(years) >= 2:
+                return min(years), max(years)
+        elif len(years) == 2:
+            return years[0], years[1]
+        elif len(years) == 1:
+            return years[0], years[0]
+        
+        return None, None
 
     def store_sample_metadata(self) -> List[str]:
         points = []
@@ -34,11 +56,13 @@ class SearchService:
             
         for idx, data in enumerate(data_dict):
             try:
+                period_start, period_end = self.get_single_range(data["period"])
+                
                 dict_data = {
                     "id": data["id"],
                     "date": data["date"],
                     "accession_number": data["accession_number"],
-                    "medium": data["medium"],
+                    "medium": data["medium"].lower(),
                     "dimensions": data["dimensions"],
                     "status": data["status"],
                     "public_access": data["public_access"],
@@ -46,16 +70,17 @@ class SearchService:
                     "instance_id": data["instance_id"],
                     "title": data["title"],
                     "department_id": data["department_id"],
-                    "department": data["department"],
-                    "period": data["period"],
+                    "department": data["department"].lower(),
+                    "period_start": period_start,
+                    "period_end": period_end,
                     "signed": data["signed"],
                     "keywords": data["keywords"],
                     "condition": data["condition"],
                     "inscribed": data["inscribed"],
-                    "paper_support": data["paper_support"],
+                    "paper_support": data["paper_support"].lower(),
                     "attributes": data["attributes"],
                     "artist_bio": data["artists"][0]["bio"],
-                    "artist_name": data["artists"][0]["name"],
+                    "artist_name": data["artists"][0]["name"].lower()
                 }
 
                 image = load_image_from_path(data["primary_image"])
@@ -86,37 +111,37 @@ class SearchService:
             if not qdrant_helper.create_collection():
                 return False
             
-            # ##################################
-            # ## Store sample metadata points ##
-            # ##################################
-            # points = _self.store_sample_metadata()
+            ##################################
+            ## Store sample metadata points ##
+            ##################################
+            points = _self.store_sample_metadata()
 
-            #######################################
-            # Store data from image_store folder ##
-            #######################################
-            image_paths = _self._get_all_image_paths()
-            if not image_paths:
-                logger.warning("No images found in image store")
-                return False
+            # #######################################
+            # # Store data from image_store folder ##
+            # #######################################
+            # image_paths = _self._get_all_image_paths()
+            # if not image_paths:
+            #     logger.warning("No images found in image store")
+            #     return False
             
-            points = []
+            # points = []
 
-            # Process images and create embeddings
-            for idx, path in enumerate(tqdm(image_paths, desc="Processing images")):
-                try:
-                    image = load_image_from_path(path)
-                    if image:
-                        embedding = clip_helper.get_image_embedding(image)
-                        points.append(
-                            PointStruct(
-                                id=idx,
-                                vector=embedding.tolist(),
-                                payload={"path": path, "index": idx}
-                            )
-                        )
-                except Exception as e:
-                    logger.warning(f"Skipping image {path}: {e}")
-                    continue
+            # # Process images and create embeddings
+            # for idx, path in enumerate(tqdm(image_paths, desc="Processing images")):
+            #     try:
+            #         image = load_image_from_path(path)
+            #         if image:
+            #             embedding = clip_helper.get_image_embedding(image)
+            #             points.append(
+            #                 PointStruct(
+            #                     id=idx,
+            #                     vector=embedding.tolist(),
+            #                     payload={"path": path, "index": idx}
+            #                 )
+            #             )
+            #     except Exception as e:
+            #         logger.warning(f"Skipping image {path}: {e}")
+            #         continue
             
             ##################### Save data from the image_store folder till here #########################
 
@@ -144,7 +169,7 @@ class SearchService:
             
             results = qdrant_helper.search_vectors(
                 query_vector=text_embedding.tolist(),
-                # limit=Config.DEFAULT_TOP_K,
+                limit=Config.DEFAULT_TOP_K,
                 score_threshold=Config.SIMILARITY_THRESHOLD
             )
             
@@ -161,10 +186,8 @@ class SearchService:
                 if not self.build_image_index():
                     return []
             
-            # Get image embedding
             image_embedding = clip_helper.get_image_embedding(image)
             
-            # Search in Qdrant
             result = qdrant_helper.query_points(
                 query=image_embedding.tolist(),
                 limit=Config.IMAGE_TOP_K,
@@ -202,7 +225,6 @@ class SearchService:
             ("system", metadata_system_prompt),
             ("human", query),
         ]
-
         llm = self.initialize_llm()    
         response = llm.invoke(messages).content
         result = json.loads(response)
@@ -213,18 +235,17 @@ class SearchService:
         """Search images by metadata using external API"""        
         try:
             metadata_json = self.create_metadata(query)
-
             if not self.is_indexed:
                 if not self.build_image_index():
                     return []
 
-            # Get text embedding
             text_embedding = clip_helper.get_text_embedding(query)
 
             results = qdrant_helper.metadata_based_searching(
                 # query=query,
                 query_vector=text_embedding.tolist(),
-                metadata_json=metadata_json
+                metadata_json=metadata_json,
+                limit=Config.IMAGE_TOP_K
             )
 
             return [result["payload"]["path"] for result in results]
@@ -236,13 +257,12 @@ class SearchService:
     def hybrid_search(self, query: str) -> List[str]:
         """Combine metadata and feature-based search"""
         try:
-            metadata_results = self.search_by_api(query)            # For API based searching
-            # metadata_results = self.search_by_metadata(query)     # For Metadata based searching
+            # metadata_results = self.search_by_api(query)            # For API based searching
+            metadata_results = self.search_by_metadata(query)     # For Metadata based searching
             
             if not metadata_results:
                 return []
             
-            # Load images and compare with query
             valid_images = []
             valid_paths = []
             
@@ -255,7 +275,6 @@ class SearchService:
             if not valid_images:
                 return metadata_results
             
-            # Use CLIP to rank images by relevance to query
             top_indices = clip_helper.compare_images_with_text(valid_images, query)
             
             return [valid_paths[idx] for idx in top_indices]
@@ -279,5 +298,4 @@ class SearchService:
         return image_paths
 
 
-# Global instance
 search_service = SearchService()

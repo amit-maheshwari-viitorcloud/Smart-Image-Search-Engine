@@ -1,8 +1,10 @@
 import logging
 from typing import List, Optional, Dict, Any
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Filter, FieldCondition, Range, MatchValue
+# from qdrant_client.http.models import Filter, FieldCondition, Range, MatchValue
+
 from qdrant_client.models import VectorParams, Distance, PointStruct, QueryResponse
+from qdrant_client.models import Filter, FieldCondition, MatchText, Range
 from config.settings import Config
 
 logging.basicConfig(level=logging.INFO)
@@ -49,7 +51,7 @@ class QdrantHelper:
             logger.error(f"Error upserting points: {e}")
             return False
     
-    def search_vectors(self, query_vector: List[float], limit: int = 5, 
+    def search_vectors(self, query_vector: List[float], limit: int, 
                       score_threshold: float = None) -> List[Dict[str, Any]]:
         """Search for similar vectors"""
         try:
@@ -77,7 +79,7 @@ class QdrantHelper:
             logger.error(f"Error searching vectors: {e}")
             return []
     
-    def query_points(self, query: List[float], limit: int = 5, 
+    def query_points(self, query: List[float], limit: int, 
                     score_threshold: float = None, with_payload: bool = True) -> Optional[QueryResponse]:
         """Query points with advanced options"""
         try:
@@ -97,23 +99,34 @@ class QdrantHelper:
             return None
 
 
-    def metadata_based_searching(self, query_vector: List[float], metadata_json: str, limit: int = 5) -> List[str]:
+    def metadata_based_searching(self, query_vector: List[float], metadata_json: str, limit: int) -> List[str]:
         """Search images by metadata using external API"""
-        key = list(metadata_json.keys())[0]
-        value = metadata_json[key]
-
-        search_filter = Filter(
-            must=[
-                FieldCondition(
-                    key=key,
-                    match=MatchValue(value=value)
+        must_conditions = []
+        for key, value in metadata_json.items():
+            if key == "period":                
+                must_conditions.extend([
+                    FieldCondition(
+                        key="period_start",
+                        range=Range(lt=value)
+                    ),
+                    FieldCondition(
+                        key="period_end",
+                        range=Range(gt=value)
+                    )
+                ])
+            else:
+                must_conditions.append(
+                    FieldCondition(
+                        key=key,
+                        match=MatchText(text=value.lower())
+                    )
                 )
-            ]
-        )
+
+        search_filter = Filter(must=must_conditions)
 
         search_results = self.client.search(
             collection_name=self.collection_name,
-            query_vector=query_vector,  # Your query vector
+            query_vector=query_vector, 
             query_filter=search_filter,
             limit=limit
         )
@@ -129,6 +142,4 @@ class QdrantHelper:
         return results
 
 
-
-# Global instance
 qdrant_helper = QdrantHelper()

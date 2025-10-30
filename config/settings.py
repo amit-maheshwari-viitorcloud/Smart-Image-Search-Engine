@@ -7,8 +7,8 @@ class Config:
     # Qdrant Configuration
     QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
     QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
-    COLLECTION_NAME = os.getenv("TMP_COLLECTION_NAME", "image_embeddings")
-    EMBEDDING_DIM = int(os.getenv("TMP_EMBEDDING_DIMENSION_SIZE", "512"))
+    COLLECTION_NAME = os.getenv("COLLECTION_NAME", "image_embeddings")
+    EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIMENSION_SIZE", "512"))
     
     # API Configuration
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
