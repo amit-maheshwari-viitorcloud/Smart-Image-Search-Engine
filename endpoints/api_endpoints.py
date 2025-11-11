@@ -56,14 +56,17 @@ class APIClient:
             )
             response.raise_for_status()
             
-            data = response.json().get('results', {}).get('data', [])
-            img_links = [item.get('primary_image') for item in data if item.get('primary_image')]
+            # data = response.json().get('results', {}).get('data', [])
+            # img_links = [item.get('primary_image') for item in data if item.get('primary_image')]
             
-            logger.info(f"Found {len(img_links)} images for query: {search_keyword}")
-            return img_links
+            # logger.info(f"Found {len(img_links)} images for query: {search_keyword}")
+            # return img_links
+            logger.info("Search API called successfully")
+            return response
         except Exception as e:
             logger.error(f"Error searching by metadata: {e}")
-            return []
+            # return []
+            return None
 
 # Global instance
 api_client = APIClient()

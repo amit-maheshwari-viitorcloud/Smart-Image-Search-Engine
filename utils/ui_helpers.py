@@ -20,4 +20,4 @@ def show_results(image_paths):
                     img = load_image_from_path(img_path)
                     if img:
                         st.image(img, caption=f"Result {idx + 1}", use_column_width=True)
-                    st.caption(str(img_path))
+                    # st.caption(str(img_path))

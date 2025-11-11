@@ -7,13 +7,13 @@ It allows users to search either **by text** or **by uploading an image**, and a
 
 ## 🚀 Features
 
-- 🔹 **Multimodal Search:** Search images by **text descriptions** or **image queries**.  
-- 🔹 **Agent-based Automation:** An LLM-powered agent chooses the best search tool (feature, metadata, hybrid, or random).  
-- 🔹 **CLIP Embeddings:** Extracts visual and textual embeddings for efficient semantic similarity.  
-- 🔹 **Qdrant Integration:** High-performance vector database for similarity search.  
-- 🔹 **Metadata Search:** Fetches results using an external metadata API (Cumulus).  
-- 🔹 **Streamlit UI:** Interactive and modern web interface.  
-- 🔹 **Caching Optimized:** Efficient indexing and model loading with `@st.cache_resource`.
+- **Multimodal Search:** Search images by **text descriptions** or **image queries**.  
+- **Agent-based Automation:** An LLM-powered agent chooses the best search tool (feature, metadata, hybrid, or random).  
+- **CLIP Embeddings:** Extracts visual and textual embeddings for efficient semantic similarity.  
+- **Qdrant Integration:** High-performance vector database for similarity search.  
+- **Metadata Search:** Fetches results using an external metadata API (Cumulus).  
+- **Streamlit UI:** Interactive and modern web interface.  
+- **Caching Optimized:** Efficient indexing and model loading with `@st.cache_resource`.
 
 ---
 
@@ -56,8 +56,8 @@ Smart-Image-Search/
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/smart-image-search.git
-cd smart-image-search
+git clone https://github.com/amit-maheshwari-viitorcloud/Smart-Image-Search-Engine.git
+cd Smart-Image-Search-Engine
 ```
 
 ### 2️⃣ Create a Virtual Environment
@@ -91,8 +91,8 @@ Create a `.env` file in your project root:
 # Qdrant Configuration
 QDRANT_HOST = "localhost"
 QDRANT_PORT = "6333"
-TMP_COLLECTION_NAME = "image_embeddings"
-TMP_EMBEDDING_DIMENSION_SIZE = "512"
+COLLECTION_NAME = "image_embeddings"
+EMBEDDING_DIMENSION_SIZE = "512"
 
 # API Configuration
 GROQ_API_KEY = "Your-Groq-Api-Key"
@@ -108,22 +108,7 @@ IMAGE_STORE_PATH = "image_store"
 
 > ⚠️ Replace `Your-Groq-Api-Key` with your actual key from [Groq Console](https://console.groq.com).
 
-### 5️⃣ Create Local Image Directory
-
-```bash
-mkdir image_store
-```
-
-Add sample images:
-
-```
-image_store/
-├── image1.png
-├── image2.png
-└── image3.png
-```
-
-### 6️⃣ Run the Application
+### 5️⃣ Run the Application
 
 ```bash
 streamlit run app.py
@@ -136,10 +121,10 @@ Then open `http://localhost:8501` in your browser.
 ## 🧠 How It Works
 
 1. **Initialization:**  
-   Loads environment variables and initializes CLIP, Qdrant, and Groq LLM agent.
+   Loads environment variables and initializes CLIP, Qdrant, and Groq LLM agent and fetch data via API.
 
 2. **User Input:**  
-   Input text (`"sunset beach"`) or upload an image.
+   Input text (`"flower"`) or upload an image.
 
 3. **Agent Decision:**  
    The LLM agent decides the appropriate search:
@@ -149,7 +134,7 @@ Then open `http://localhost:8501` in your browser.
    - `random_search`
 
 4. **Result Display:**  
-   Shows most relevant images with similarity scores.
+   Shows most relevant images to user.
 
 ---
 
@@ -183,8 +168,7 @@ Upload an image → Finds visually similar results from indexed store.
 
 ## 🧾 Notes
 
-- The `image_store/` folder is a **temporary dataset**.  
+- The data is getting fetched and injected using **temporary API**.  
 - Ensure Qdrant runs locally on port `6333`.  
-- Restart app after modifying images to rebuild index.  
 
 ---

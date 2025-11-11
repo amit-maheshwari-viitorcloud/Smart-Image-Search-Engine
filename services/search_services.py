@@ -48,55 +48,71 @@ class SearchService:
         
         return None, None
 
+
+    def safe_lower(self, val):
+        return val.lower() if isinstance(val, str) else "unknown"
+
+
     def store_sample_metadata(self) -> List[str]:
         points = []
 
-        from api_sample_data import sample_data
-        data_dict = sample_data["results"]["data"]
-            
-        for idx, data in enumerate(data_dict):
-            try:
-                period_start, period_end = self.get_single_range(data["period"])
-                
-                dict_data = {
-                    "id": data["id"],
-                    "date": data["date"],
-                    "accession_number": data["accession_number"],
-                    "medium": data["medium"].lower(),
-                    "dimensions": data["dimensions"],
-                    "status": data["status"],
-                    "public_access": data["public_access"],
-                    "path": data["primary_image"],
-                    "instance_id": data["instance_id"],
-                    "title": data["title"],
-                    "department_id": data["department_id"],
-                    "department": data["department"].lower(),
-                    "period_start": period_start,
-                    "period_end": period_end,
-                    "signed": data["signed"],
-                    "keywords": data["keywords"],
-                    "condition": data["condition"],
-                    "inscribed": data["inscribed"],
-                    "paper_support": data["paper_support"].lower(),
-                    "attributes": data["attributes"],
-                    "artist_bio": data["artists"][0]["bio"],
-                    "artist_name": data["artists"][0]["name"].lower()
-                }
+        # from api_sample_data import sample_data
+        search_query = ["Maharaja", "Mountains", "Tribal Art of India", "Photographs", "Baua Devi", "Flower", "Fruit", "Ancient Artwork", "Colonial period", "Saint", "Fashion", "British Rule", "Car"]
 
-                image = load_image_from_path(data["primary_image"])
-                if image:
-                    embedding = clip_helper.get_image_embedding(image)
-                    points.append(
-                        PointStruct(
-                            id=idx,
-                            vector=embedding.tolist(),
-                            payload=dict_data
+        logger.info("Initiated - Data Injection")
+        for query in search_query:
+            response = api_client.search_by_api(query).json()        
+            data_dict = response["results"]["data"]
+            logger.info(f"Fetching Data...")
+            for idx, data in enumerate(data_dict):
+                try:
+                    period_start, period_end = self.get_single_range(data.get("period", "unknown"))
+                    artists = data.get("artists", [])
+                    artist_bios = [self.safe_lower(artist.get("bio") or "unknown") for artist in artists]
+                    artist_names = [self.safe_lower(artist.get("name") or "unknown") for artist in artists]
+
+
+                    dict_data = {
+                        "id": data.get("id", "unknown"),
+                        "date": data.get("date", "unknown"),
+                        "accession_number": data.get("accession_number", "unknown"),
+                        "medium": self.safe_lower(data.get("medium") or "unknown"),
+                        "dimensions": data.get("dimensions", "unknown"),
+                        "status": data.get("status", "unknown"),
+                        "public_access": data.get("public_access", "unknown"),
+                        "path": data.get("primary_image", "unknown"),
+                        "instance_id": data.get("instance_id", "unknown"),
+                        "title": data.get("title", "unknown"),
+                        "department_id": data.get("department_id", "unknown"),
+                        "department": self.safe_lower(data.get("department") or "unknown"),
+                        "period_start": period_start,
+                        "period_end": period_end,
+                        "signed": data.get("signed", "unknown"),
+                        "keywords": data.get("keywords", "unknown"),
+                        "condition": data.get("condition", "unknown"),
+                        "inscribed": data.get("inscribed", "unknown"),
+                        "paper_support": self.safe_lower(data.get("paper_support") or "unknown"),
+                        "attributes": data.get("attributes", "unknown"),
+                        # "artist_bio": artist_bios,
+                        "artist_bio": " | ".join(artist_bios) if artist_bios else "unknown",
+                        # "artist_name": artist_names,
+                        "artist_name": " | ".join(artist_names) if artist_names else "unknown"
+                    }
+
+                    image = load_image_from_path(data["primary_image"])
+                    if image:
+                        embedding = clip_helper.get_image_embedding(image)
+                        points.append(
+                            PointStruct(
+                                id=data["id"],
+                                vector=embedding.tolist(),
+                                payload=dict_data
+                            )
                         )
-                    )
-            except Exception as e:
-                logger.warning(f"Skipping image {data}: {e}")
-                continue
-        
+                except Exception as e:
+                    logger.warning(f"Skipping data : {e}")
+    
+        logger.info("Completed - Data Injection")
         return points
 
 
@@ -208,8 +224,19 @@ class SearchService:
     
     def search_by_api(self, query: str) -> List[str]:
         """Search images by metadata using external API"""
-        return api_client.search_by_api(query)
-  
+        response = api_client.search_by_api(query)
+        if response is None:
+            return []
+        elif response.status_code != 200:
+            logger.error(f"API search failed with status code: {response.status_code}")
+            return []
+        else:
+            data = response.json().get('results', {}).get('data', [])
+            img_links = [item.get('primary_image') for item in data if item.get('primary_image')]
+            
+            logger.info(f"Found {len(img_links)} images for query: {query}")
+            return img_links
+ 
 
     def initialize_llm(self):
         llm = ChatGroq(
