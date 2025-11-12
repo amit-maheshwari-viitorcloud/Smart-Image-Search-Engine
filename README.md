@@ -99,7 +99,7 @@ GROQ_API_KEY = "Your-Groq-Api-Key"
 
 # OAuth Configuration
 CUMULUS_CLIENT_ID = "CUMULUS-IDCCG-PUB"
-CUMULUS_API_KEY = "41204aed-89d7-4a45-9455-976ac475a8ab"
+CUMULUS_API_KEY = "Your-Cumulus-Api-Key"
 
 # Model Configuration
 CLIP_MODEL_ID = "openai/clip-vit-base-patch32"

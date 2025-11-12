@@ -54,13 +54,10 @@ def process_image_search(uploaded_file):
 # ---- Streamlit Interface ----
 def main():
     """Main application function"""
-    st.title("🔍 Smart Image Search Engine")
     if not initialize_app():
         return
     
     executor = initialize_agent()
-
-    st.sidebar.button("🚪 Logout", on_click=logout)
 
     query = st.text_input(
         "Enter your search (by description, artist, feature, etc):",
