@@ -112,6 +112,12 @@ class SearchService:
                 except Exception as e:
                     logger.warning(f"Skipping data : {e}")
     
+            if points:
+                success = qdrant_helper.upsert_points(points)
+                if success:
+                    self.is_indexed = True
+                    logger.info(f"Successfully indexed {len(points)} images")
+            points = []
         logger.info("Completed - Data Injection")
         return points
 
@@ -130,7 +136,8 @@ class SearchService:
             ##################################
             ## Store sample metadata points ##
             ##################################
-            points = _self.store_sample_metadata()
+            # points = _self.store_sample_metadata()
+            success = _self.store_sample_metadata()
 
             # #######################################
             # # Store data from image_store folder ##
@@ -161,14 +168,16 @@ class SearchService:
             
             ##################### Save data from the image_store folder till here #########################
 
-            if points:
-                success = qdrant_helper.upsert_points(points)
-                if success:
-                    _self.is_indexed = True
-                    logger.info(f"Successfully indexed {len(points)} images")
-                return success
-            return False
-            
+            # if points:
+            #     success = qdrant_helper.upsert_points(points)
+            #     if success:
+            #         _self.is_indexed = True
+            #         logger.info(f"Successfully indexed {len(points)} images")
+            #     return success
+            # return False
+
+            return success
+
         except Exception as e:
             logger.error(f"Error building image index: {e}")
             return False

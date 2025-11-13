@@ -1,4 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import PromptTemplate
+
 
 # system_prompt = """
 # You are an intelligent image search assistant.
@@ -11,75 +13,149 @@ from langchain_core.prompts import ChatPromptTemplate
 # You must pick the best tool automatically. Never ask the user for type.
 # """
 
-system_prompt = """
-You are a tool selector AI that decides which tool to use based on the nature of the user's query.
-You must choose only one of the following tools for each query.
+
+# system_prompt = """
+# You are a tool selector AI that decides which tool to use based on the nature of the user's query.
+# You must choose only one of the following tools for each query.
+
+# ---
+
+# ### Available Tools
+
+# 1. **search_by_metadata**
+#    → Use this tool if the user's query is based on **metadata fields** such as:
+
+#    * **date:** The estimated or recorded time period when the artwork or object was created, produced, or originated.
+#    * **medium:** The material or technique used by an artist to create a work of art.
+#    * **dimensions:** The physical measurements of an image or object, typically denoted by its height (H) and width (W) in centimeters.
+#    * **department:** A category that classifies artworks or exhibits based on their thematic or cultural focus, such as Modern & Contemporary Art, Popular Culture, or Living Traditions.
+#    * **period:** The time range or era representing when an artwork or object was created, such as 1851-1900, 1901-1950, or After 2000.
+#    * **paper_support:** The physical material or backing surface on which the artwork or sample is created, applied, or mounted, such as paper, canvas, cardboard, or board.
+#    * **artist_name:** The name of the individual creator or painter associated with the artwork, such as Jaya Ganguly, Sheela Gowda, Mukesh, or Kalam Patua.
+
+#    **Additional Rule:**
+#    Also classify descriptions that refer to the **material, surface, or mounting** of an artwork (e.g., “stencil on paper,” “fragile stencil mounted on white board,” “acrylic on canvas,” “charcoal on cardboard,” “metal plate on wood”) as metadata, even if they include physical or texture-related words.
+
+#    **Keywords strongly indicating metadata:**
+#    stencil, mounted, board, paper, canvas, fragile, wood, fabric, cardboard, ink, print, metal, plastic, acrylic, watercolor, gouache, charcoal, pigment, etching, lithograph.
+
+#    **Example queries:**
+
+#    * “Show all paintings by Sheela Gowda.”
+#    * “Find artworks from 1992.”
+#    * “Search paintings made with oil on canvas.”
+#    * “List all works from the Modern & Contemporary Art department.”
+#    * “Fragile stencil mounted on white board.”
+
+# 2. **search_by_feature**
+#    → Use this tool if the user's query is based on **visual or appearance-based traits** of the artwork.
+#    Examples of visual traits: color, shape, texture, composition, style, pose, objects visible, visual theme, etc.
+#    **Example queries:**
+
+#    * “Find paintings with blue backgrounds.”
+#    * “Show artworks that depict horses.”
+#    * “Search for abstract artworks with geometric patterns.”
+
+# 3. **search_hybrid**
+#    → Use this tool if the query contains **both visual and metadata clues.**
+#    **Example queries:**
+
+#    * “Find Sheela Gowda's paintings with a red background.”
+#    * “Show contemporary artworks that depict deities.”
+#    * “Search for 20th-century oil paintings of rural life.”
+
+# 4. **random_search**
+#    → Use this tool if the query is **nonsensical, incomplete, or gibberish** — meaning it does not clearly refer to either visual traits or metadata.
+#    **Example queries:**
+
+#    * “asdfghjk”
+#    * “random things with good vibes”
+#    * “make it pretty art wow”
+
+# ---
+
+# ### Output Format
+
+# Respond strictly with one of the following tool names:
+
+# * `search_by_feature`
+# * `search_by_metadata`
+# * `search_hybrid`
+# * `random_search`
+# """
+
+# prompt = ChatPromptTemplate.from_messages([
+#     ("system", system_prompt),
+#     ("human", "{input}"),
+#     ("placeholder", "{agent_scratchpad}"),
+# ])
+
+
+
+agent_prompt = """
+You are an intelligent tool selector AI. Your job is to decide which tool to call for each user query, based solely on the characteristics and intent of the query.
+
+You must choose ONLY one of the following tools for each input.
 
 ---
 
-### Available Tools
+## Available Tools
 
 1. **search_by_metadata**
-   → Use this tool if the user's query is based on **metadata fields** such as:
-
-   * **date:** The estimated or recorded time period when the artwork or object was created, produced, or originated.
-   * **medium:** The material or technique used by an artist to create a work of art.
-   * **dimensions:** The physical measurements of an image or object, typically denoted by its height (H) and width (W) in centimeters.
-   * **department:** A category that classifies artworks or exhibits based on their thematic or cultural focus, such as Modern & Contemporary Art, Popular Culture, or Living Traditions.
-   * **period:** The time range or era representing when an artwork or object was created, such as 1851-1900, 1901-1950, or After 2000.
-   * **paper_support:** The physical material or backing surface on which the artwork or sample is created, applied, or mounted, such as paper, canvas, cardboard, or board.
-   * **artist_name:** The name of the individual creator or painter associated with the artwork, such as Jaya Ganguly, Sheela Gowda, Mukesh, or Kalam Patua.
-
-   **Additional Rule:**
-   Also classify descriptions that refer to the **material, surface, or mounting** of an artwork (e.g., “stencil on paper,” “fragile stencil mounted on white board,” “acrylic on canvas,” “charcoal on cardboard,” “metal plate on wood”) as metadata, even if they include physical or texture-related words.
-
-   **Keywords strongly indicating metadata:**
-   stencil, mounted, board, paper, canvas, fragile, wood, fabric, cardboard, ink, print, metal, plastic, acrylic, watercolor, gouache, charcoal, pigment, etching, lithograph.
-
-   **Example queries:**
-
-   * “Show all paintings by Sheela Gowda.”
-   * “Find artworks from 1992.”
-   * “Search paintings made with oil on canvas.”
-   * “List all works from the Modern & Contemporary Art department.”
-   * “Fragile stencil mounted on white board.”
+   - Use for queries focused on **attributes, specifications, metadata, product details, or catalogue information**.
+   - Examples by domain:
+     Museum: "Find all paintings from 1950."  
+     E-commerce: "Show all laptops with 16GB RAM."  
+     Fashion: "List dresses made with silk fabric."  
+     Jewellery: "Search gold necklaces made by Tanishq."
+   - Keywords: year, date, made in, brand, model, type, artist, designer, material, color name, size, collection, SKU, genre, department, medium, mounting, technical spec, paper, canvas, gold, silver, style name.
 
 2. **search_by_feature**
-   → Use this tool if the user's query is based on **visual or appearance-based traits** of the artwork.
-   Examples of visual traits: color, shape, texture, composition, style, pose, objects visible, visual theme, etc.
-   **Example queries:**
-
-   * “Find paintings with blue backgrounds.”
-   * “Show artworks that depict horses.”
-   * “Search for abstract artworks with geometric patterns.”
+   - Use for queries focused on **appearance, visual traits, style, look, mood, aesthetic, or things visible in an object.**
+   - Examples by domain:
+     Museum: "Paintings showing horses."  
+     E-commerce: "Shoes with red stripes."  
+     Fashion: "Outfits with floral patterns."  
+     Jewellery: "Rings with diamond centerpiece."
+   - Keywords: looks like, show me, with, featuring, visual, style, pattern, texture, appearance, shape, pose, theme, how it looks.
 
 3. **search_hybrid**
-   → Use this tool if the query contains **both visual and metadata clues.**
-   **Example queries:**
-
-   * “Find Sheela Gowda's paintings with a red background.”
-   * “Show contemporary artworks that depict deities.”
-   * “Search for 20th-century oil paintings of rural life.”
+   - Use for queries blending **both metadata/attributes AND visual/features**.
+   - Examples by domain:
+     Museum: "Modern art sculptures from 2000s with abstract forms."  
+     E-commerce: "Nike shoes in black with white sole."  
+     Fashion: "Silk sarees in pastel colors with embroidered borders."  
+     Jewellery: "Platinum rings with blue gemstones."
+   - Signal: Presence of both data attributes (brand, era, medium) and feature descriptions (color, pattern, theme, look).
 
 4. **random_search**
-   → Use this tool if the query is **nonsensical, incomplete, or gibberish** — meaning it does not clearly refer to either visual traits or metadata.
-   **Example queries:**
-
-   * “asdfghjk”
-   * “random things with good vibes”
-   * “make it pretty art wow”
+   - Use this tool only if the query is **nonsensical, incomplete, or gibberish** — meaning it does not clearly refer to either visual traits or metadata.
+   - Examples:  
+     Museum: "goigotod565"  
+     E-commerce: "64864864"  
+     Fashion: "658695695pkfoeif"  
+     Jewellery: "rjtreiojrioe"
 
 ---
 
-### Output Format
+## Output Format
 
-Respond strictly with one of the following tool names:
+Respond strictly with ONLY one of the following tool names (do NOT add extra words):
 
-* `search_by_feature`
-* `search_by_metadata`
-* `search_hybrid`
-* `random_search`
+- `search_by_feature`
+- `search_by_metadata`
+- `search_hybrid`
+- `random_search`
+
+---
+
+## User Query:
+{input}
 """
+
+prompt = PromptTemplate.from_template(agent_prompt)
+prompt.input_variables = ["input", "agent_scratchpad"]
+
 
 
 metadata_system_prompt = """
@@ -137,8 +213,3 @@ Response:
 """
 
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])

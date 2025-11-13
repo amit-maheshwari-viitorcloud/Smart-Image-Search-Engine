@@ -20,7 +20,7 @@ class Config:
     IMAGE_STORE_PATH = os.getenv("IMAGE_STORE_PATH", "image_store")
     
     # Search Configuration
-    DEFAULT_TOP_K = 20
+    DEFAULT_TOP_K = 2000
     IMAGE_TOP_K = 10000
     SIMILARITY_THRESHOLD = 0.2
     IMAGE_SIMILARITY_THRESHOLD = 0.75
